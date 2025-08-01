@@ -1,0 +1,271 @@
+/* TradingView Light Theme Overrides */
+.chart-container {
+  background-color: #ffffff !important;
+}
+
+/* Force all backgrounds to be light */
+div[class*="chart-"], 
+div[class*="layout__area"],
+div[class*="chart-gui"],
+.tv-chart-view__container,
+.chart-page,
+iframe body {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+}
+
+/* Override dark theme elements */
+.tv-side-panel__tabs {
+  background-color: #f5f5f5 !important;
+  color: #333333 !important;
+}
+
+.tv-side-panel__tab {
+  color: #666666 !important;
+}
+
+.tv-side-panel__tab--active {
+  background-color: #ffffff !important;
+  color: #333333 !important;
+}
+
+/* Header and toolbar */
+.tv-header {
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #e0e0e0 !important;
+}
+
+.tv-header__special-button {
+  color: #333333 !important;
+}
+
+/* Chart controls */
+.chart-controls-bar {
+  background-color: #f8f9fa !important;
+  border-top: 1px solid #e0e0e0 !important;
+}
+
+/* Dialogs and modals */
+.tv-dialog {
+  background-color: #ffffff !important;
+  color: #333333 !important;
+}
+
+.tv-dialog__title {
+  color: #333333 !important;
+}
+
+/* Dropdown menus */
+.tv-dropdown__body {
+  background-color: #ffffff !important;
+  border: 1px solid #e0e0e0 !important;
+  color: #333333 !important;
+}
+
+.tv-dropdown__item:hover {
+  background-color: #f5f5f5 !important;
+}
+
+/* Symbol search */
+.tv-symbol-search-dialog__content {
+  background-color: #ffffff !important;
+}
+
+.tv-symbol-search-dialog__input {
+  background-color: #f5f5f5 !important;
+  color: #333333 !important;
+  border: 1px solid #e0e0e0 !important;
+}
+
+/* Drawing tools panel */
+.tv-side-toolbar {
+  background-color: #ffffff !important;
+  border-right: 1px solid #e0e0e0 !important;
+}
+
+.tv-side-toolbar__button {
+  color: #666666 !important;
+}
+
+.tv-side-toolbar__button:hover {
+  background-color: #f5f5f5 !important;
+}
+
+/* Time intervals */
+.tv-resolution-selector__button {
+  color: #666666 !important;
+}
+
+.tv-resolution-selector__button--active {
+  background-color: #e3f2fd !important;
+  color: #1976d2 !important;
+}
+
+/* Study templates */
+.tv-study-template-widget {
+  background-color: #ffffff !important;
+  color: #333333 !important;
+}
+
+/* Context menus */
+.tv-context-menu {
+  background-color: #ffffff !important;
+  border: 1px solid #e0e0e0 !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.tv-context-menu__item {
+  color: #333333 !important;
+}
+
+.tv-context-menu__item:hover {
+  background-color: #f5f5f5 !important;
+}
+
+/* Loading screen */
+.tv-spinner-container {
+  background-color: #ffffff !important;
+}
+
+/* No data screen */
+.tv-no-datafeed {
+  background-color: #ffffff !important;
+  color: #333333 !important;
+}
+
+.tv-no-datafeed__text {
+  color: #666666 !important;
+}
+
+/* Target no data state more specifically */
+[class*="noData"],
+[class*="no-data"],
+[class*="empty-state"],
+.chart-container--empty,
+.tv-chart-no-data,
+div:has(> :contains("No data")) {
+  background-color: #ffffff !important;
+  color: #333333 !important;
+}
+
+/* Datafeed error states */
+.tv-datafeed-error {
+  background-color: #ffffff !important;
+  color: #333333 !important;
+}
+
+/* Chart loading states */
+.tv-chart-loading,
+.chart-loading {
+  background-color: #ffffff !important;
+}
+
+/* Chart container */
+.chart-container,
+.chart-widget,
+.chart-page {
+  background-color: #ffffff !important;
+}
+
+/* Main chart area */
+.chart-gui-wrapper {
+  background-color: #ffffff !important;
+}
+
+.layout__area--center {
+  background-color: #ffffff !important;
+}
+
+/* Legend */
+.pane-legend {
+  color: #333333 !important;
+}
+
+/* Scales */
+.price-axis__label {
+  color: #666666 !important;
+}
+
+.time-axis__label {
+  color: #666666 !important;
+}
+
+/* Crosshair */
+.chart-crosshair-label {
+  background-color: #333333 !important;
+  color: #ffffff !important;
+}
+
+/* Tooltips */
+.tv-tooltip {
+  background-color: #333333 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+/* Buttons */
+.tv-button {
+  background-color: #f5f5f5 !important;
+  color: #333333 !important;
+  border: 1px solid #e0e0e0 !important;
+}
+
+.tv-button:hover {
+  background-color: #e0e0e0 !important;
+}
+
+.tv-button--primary {
+  background-color: #1976d2 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.tv-button--primary:hover {
+  background-color: #1565c0 !important;
+}
+
+/* Input fields */
+.tv-control-input {
+  background-color: #ffffff !important;
+  color: #333333 !important;
+  border: 1px solid #e0e0e0 !important;
+}
+
+.tv-control-input:focus {
+  border-color: #1976d2 !important;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  background-color: #f5f5f5 !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #cccccc !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #999999 !important;
+}
+
+/* Global override for any remaining dark backgrounds */
+.tv-main * {
+  background-color: inherit !important;
+}
+
+.tv-main {
+  background-color: #ffffff !important;
+}
+
+/* Target the chart iframe content */
+iframe#tradingview_widget {
+  background-color: #ffffff !important;
+}
+
+/* Override any inline styles */
+[style*="background-color: rgb(0"],
+[style*="background-color: #0"],
+[style*="background-color: #1"],
+[style*="background-color: #2"] {
+  background-color: #ffffff !important;
+}
