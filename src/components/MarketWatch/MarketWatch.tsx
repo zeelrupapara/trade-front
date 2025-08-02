@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMarketStore } from '../../stores/marketStore';
 import { websocketService } from '../../services/websocket';
+import { marketWatchService } from '../../services/marketWatch';
+import SymbolManagementModal from './SymbolManagementModal';
 
 interface PriceUpdate {
   symbol: string;
@@ -22,6 +24,8 @@ export default function MarketWatch() {
   
   const priceRefs = useRef<Map<string, HTMLElement>>(new Map());
   const lastPrices = useRef<Map<string, number>>(new Map());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [removingSymbol, setRemovingSymbol] = useState<string | null>(null);
 
   // Update prices with animation
   useEffect(() => {
@@ -80,16 +84,56 @@ export default function MarketWatch() {
     selectSymbol(symbol);
   };
 
+  const handleRemoveSymbol = async (symbol: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click
+    setRemovingSymbol(symbol);
+    try {
+      await marketWatchService.removeSymbol(symbol);
+      // The WebSocket will auto-unsubscribe and update the store
+    } catch (err) {
+      // Error removing symbol
+    } finally {
+      setRemovingSymbol(null);
+    }
+  };
+
   return (
     <div className="h-full bg-white flex flex-col">
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-gray-900">Market Watch</h2>
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-xs text-gray-600">
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors group"
+              title="Manage Symbols"
+            >
+              <svg 
+                className="w-5 h-5 text-gray-600 group-hover:text-gray-800" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" 
+                />
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" 
+                />
+              </svg>
+            </button>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-xs text-gray-600">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
           </div>
         </div>
         
@@ -107,6 +151,7 @@ export default function MarketWatch() {
               <th className="text-right p-3">Ask</th>
               <th className="text-right p-3">Last</th>
               <th className="text-right p-3">Volume</th>
+              <th className="text-center p-3 w-10"></th>
             </tr>
           </thead>
           <tbody>
@@ -152,17 +197,61 @@ export default function MarketWatch() {
                     {symbols.get(symbol)?.volume?.toFixed(2) || '0.00'}
                   </span>
                 </td>
+                <td className="p-3 text-center">
+                  <button
+                    onClick={(e) => handleRemoveSymbol(symbol, e)}
+                    disabled={removingSymbol === symbol}
+                    className="p-1 hover:bg-red-50 rounded transition-colors group"
+                    title="Remove from watchlist"
+                  >
+                    {removingSymbol === symbol ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+                    ) : (
+                      <svg 
+                        className="w-4 h-4 text-gray-400 group-hover:text-red-500" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          strokeWidth={2} 
+                          d="M6 18L18 6M6 6l12 12" 
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         
         {watchlist.length === 0 && (
-          <div className="p-4 text-center text-gray-600">
-            No symbols in watchlist
+          <div className="p-8 text-center">
+            <div className="text-gray-500 mb-4">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-gray-600 font-medium">No symbols in watchlist</p>
+              <p className="text-sm text-gray-500 mt-1">Click the settings icon to add symbols</p>
+            </div>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Add Symbols
+            </button>
           </div>
         )}
       </div>
+
+      {/* Symbol Management Modal */}
+      <SymbolManagementModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </div>
   );
 }

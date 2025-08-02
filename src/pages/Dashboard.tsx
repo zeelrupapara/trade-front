@@ -88,13 +88,39 @@ export default function Dashboard() {
       });
 
       // Handle single symbol auto-subscribe
-      websocketService.onMessage('auto_subscribe', () => {});
+      websocketService.onMessage('auto_subscribe', (message) => {
+        if (message.data && message.data.symbol) {
+          useMarketStore.getState().addToWatchlist(message.data.symbol);
+        }
+      });
 
       // Handle single symbol auto-unsubscribe
-      websocketService.onMessage('auto_unsubscribe', () => {});
+      websocketService.onMessage('auto_unsubscribe', (message) => {
+        if (message.data && message.data.symbol) {
+          useMarketStore.getState().removeFromWatchlist(message.data.symbol);
+        }
+      });
+
+      // Set initial connection status
+      setConnected(websocketService.isConnected());
+
+      // Register connection status handlers
+      const unsubscribeConnect = websocketService.onConnect(() => {
+        setConnected(true);
+      });
+
+      const unsubscribeDisconnect = websocketService.onDisconnect(() => {
+        setConnected(false);
+      });
+
+      // Cleanup connection handlers
+      return () => {
+        unsubscribeConnect();
+        unsubscribeDisconnect();
+      };
     }
     
-    // No cleanup needed - WebSocket lifecycle is managed by WebSocketProvider
+    // No cleanup needed for WebSocket lifecycle - it's managed by WebSocketProvider
   }, [isAuthenticated, setConnected]);
 
   if (isLoading) {
