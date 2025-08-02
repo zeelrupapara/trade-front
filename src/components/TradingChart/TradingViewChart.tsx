@@ -17,6 +17,9 @@ export default function TradingViewChart() {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Don't recreate widget on symbol change, only on initial mount
+    if (widgetRef.current) return;
+
     // For now, let's create a placeholder
     // In a real implementation, you would load the TradingView library
     const loadTradingView = () => {
@@ -124,9 +127,14 @@ export default function TradingViewChart() {
         
         // Add Enigma indicator when chart is ready
         widget.onChartReady(() => {
-          const chart = widget.chart();
-          const symbol = selectedSymbol || watchlist[0] || 'BTCUSDT';
-          addEnigmaIndicator(chart, symbol);
+          try {
+            const chart = widget.chart();
+            const symbol = selectedSymbol || watchlist[0] || 'BTCUSDT';
+            // TODO: Enable enigma indicator when TradingView library properly supports custom shapes
+            // addEnigmaIndicator(chart, symbol);
+          } catch (error) {
+            console.error('Error adding Enigma indicator:', error);
+          }
         });
       } else {
         // Placeholder when TradingView is not loaded
@@ -155,12 +163,34 @@ export default function TradingViewChart() {
         widgetRef.current.remove();
       }
     };
-  }, [selectedSymbol, watchlist]);
+  }, []); // Only run on mount, not on symbol changes
 
   // Update symbol when selection changes
   useEffect(() => {
-    if (widgetRef.current && selectedSymbol && window.TradingView) {
-      widgetRef.current.setSymbol(selectedSymbol, '1D', () => {});
+    if (widgetRef.current && selectedSymbol) {
+      try {
+        // Check if it's a TradingView widget
+        if (window.TradingView && widgetRef.current.setSymbol) {
+          widgetRef.current.setSymbol(selectedSymbol, widgetRef.current.chart().resolution() || '1D', () => {
+            // After symbol change, update enigma indicator
+            try {
+              const chart = widgetRef.current.chart();
+              // TODO: Enable enigma indicator when TradingView library properly supports custom shapes
+              // addEnigmaIndicator(chart, selectedSymbol);
+            } catch (error) {
+              console.error('Error updating Enigma indicator:', error);
+            }
+          });
+        } else if (containerRef.current) {
+          // Update placeholder
+          const placeholderElement = containerRef.current.querySelector('p');
+          if (placeholderElement) {
+            placeholderElement.textContent = `Symbol: ${selectedSymbol}`;
+          }
+        }
+      } catch (error) {
+        console.error('Error updating chart symbol:', error);
+      }
     }
   }, [selectedSymbol]);
 
