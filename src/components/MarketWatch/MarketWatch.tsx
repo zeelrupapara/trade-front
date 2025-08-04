@@ -24,6 +24,7 @@ export default function MarketWatch() {
   
   const priceRefs = useRef<Map<string, HTMLElement>>(new Map());
   const lastPrices = useRef<Map<string, number>>(new Map());
+  const priceColors = useRef<Map<string, string>>(new Map());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [removingSymbol, setRemovingSymbol] = useState<string | null>(null);
 
@@ -36,10 +37,11 @@ export default function MarketWatch() {
         const oldBid = lastPrices.current.get(`${symbol}-bid`) || 0;
         bidElement.textContent = symbolData.bid.toFixed(5);
         if (oldBid !== 0 && oldBid !== symbolData.bid) {
-          bidElement.style.color = symbolData.bid > oldBid ? '#10b981' : '#ef4444';
-          setTimeout(() => {
-            bidElement.style.color = '#374151';
-          }, 500);
+          const newColor = symbolData.bid > oldBid ? '#10b981' : '#ef4444';
+          bidElement.style.color = newColor;
+          priceColors.current.set(`${symbol}-bid`, newColor);
+        } else if (priceColors.current.has(`${symbol}-bid`)) {
+          bidElement.style.color = priceColors.current.get(`${symbol}-bid`)!;
         }
         lastPrices.current.set(`${symbol}-bid`, symbolData.bid);
       }
@@ -50,10 +52,11 @@ export default function MarketWatch() {
         const oldAsk = lastPrices.current.get(`${symbol}-ask`) || 0;
         askElement.textContent = symbolData.ask.toFixed(5);
         if (oldAsk !== 0 && oldAsk !== symbolData.ask) {
-          askElement.style.color = symbolData.ask > oldAsk ? '#10b981' : '#ef4444';
-          setTimeout(() => {
-            askElement.style.color = '#374151';
-          }, 500);
+          const newColor = symbolData.ask > oldAsk ? '#10b981' : '#ef4444';
+          askElement.style.color = newColor;
+          priceColors.current.set(`${symbol}-ask`, newColor);
+        } else if (priceColors.current.has(`${symbol}-ask`)) {
+          askElement.style.color = priceColors.current.get(`${symbol}-ask`)!;
         }
         lastPrices.current.set(`${symbol}-ask`, symbolData.ask);
       }
@@ -64,10 +67,11 @@ export default function MarketWatch() {
         const oldLast = lastPrices.current.get(`${symbol}-last`) || 0;
         lastElement.textContent = symbolData.last.toFixed(5);
         if (oldLast !== 0 && oldLast !== symbolData.last) {
-          lastElement.style.color = symbolData.last > oldLast ? '#10b981' : '#ef4444';
-          setTimeout(() => {
-            lastElement.style.color = '#374151';
-          }, 500);
+          const newColor = symbolData.last > oldLast ? '#10b981' : '#ef4444';
+          lastElement.style.color = newColor;
+          priceColors.current.set(`${symbol}-last`, newColor);
+        } else if (priceColors.current.has(`${symbol}-last`)) {
+          lastElement.style.color = priceColors.current.get(`${symbol}-last`)!;
         }
         lastPrices.current.set(`${symbol}-last`, symbolData.last);
       }
