@@ -8,6 +8,7 @@ import { websocketService } from '../services/websocket';
 import { useMarketStore } from '../stores/marketStore';
 import { marketWatchService } from '../services/marketWatch';
 import { DEFAULT_SYMBOLS } from '../utils/defaultSymbols';
+import { ChartErrorBoundary } from '../components/ErrorBoundary';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -30,76 +31,208 @@ export default function Dashboard() {
           const symbolNames = response.symbols.map(s => s.symbol);
           useMarketStore.getState().setWatchlist(symbolNames);
           
-          // Update symbol data with initial prices
+          // Mark that user has configured their watchlist
+          localStorage.setItem('has_configured_watchlist', 'true');
+          
+          // Update symbol data with initial prices including Enigma and sync status
           response.symbols.forEach(symbolData => {
             useMarketStore.getState().updateSymbolData({
               symbol: symbolData.symbol,
               description: symbolData.name || symbolData.symbol,
               exchange: '',
               currency: 'USD',
-              bid: symbolData.bid,
-              ask: symbolData.ask,
-              last: symbolData.price,
-              change: symbolData.change,
-              changePercent: symbolData.changePercent,
-              volume: symbolData.volume,
-              timestamp: symbolData.timestamp
+              bid: symbolData.bid || 0,
+              ask: symbolData.ask || 0,
+              last: symbolData.price || symbolData.last || 0,
+              price: symbolData.price || symbolData.last || 0,
+              high: symbolData.high || 0,
+              low: symbolData.low || 0,
+              change: symbolData.change || 0,
+              changePercent: symbolData.changePercent || 0,
+              volume: symbolData.volume || 0,
+              timestamp: symbolData.timestamp || Date.now(),
+              sync_status: symbolData.sync_status || 'pending',
+              sync_progress: symbolData.sync_progress || 0,
+              enigma: symbolData.enigma || undefined
             });
           });
         } else {
-          // Use default symbols if user has no watchlist
-          useMarketStore.getState().setWatchlist(DEFAULT_SYMBOLS);
+          // Check if user needs default symbols (first time user)
+          // This could be improved by having the backend indicate if user is new
+          const hasHadWatchlist = localStorage.getItem('has_configured_watchlist');
           
-          // Add default symbols to user's watchlist
-          DEFAULT_SYMBOLS.forEach(symbol => {
-            marketWatchService.addSymbol(symbol).catch(() => {});
-          });
+          if (!hasHadWatchlist) {
+            // First time user - set up default symbols
+            useMarketStore.getState().setWatchlist(DEFAULT_SYMBOLS);
+            
+            // Add default symbols to user's watchlist
+            DEFAULT_SYMBOLS.forEach(symbol => {
+              marketWatchService.addSymbol(symbol).catch(() => {});
+            });
+            
+            // Mark that user has had a watchlist configured
+            localStorage.setItem('has_configured_watchlist', 'true');
+          } else {
+            // Existing user with empty watchlist - respect their choice
+            useMarketStore.getState().setWatchlist([]);
+          }
         }
       });
       
       // WebSocket connection is handled by WebSocketProvider in App.tsx
-      // Just set up message handlers here
+      // Set up message handlers and store their cleanup functions
+      const cleanupFunctions: Array<() => void> = [];
 
       // Handle market watch symbols response
-      websocketService.onMessage('market_watch_subscribe', (message) => {
+      const unsubMarketWatch = websocketService.onMessage('market_watch_subscribe', (message) => {
         if (message.data && message.data.symbols && message.data.symbols.length > 0) {
           // Update the watchlist in store
           useMarketStore.getState().setWatchlist(message.data.symbols);
-          
-          // No need to manually subscribe - backend auto-subscribes based on session
+          // Backend auto-subscribes based on session, no manual subscription needed
         }
       });
+      cleanupFunctions.push(unsubMarketWatch);
 
-      // Handle price updates (backend sends 'price' type)
-      websocketService.onMessage('price', (message) => {
+      // Handle price updates (backend sends 'price' type via binary protocol)
+      const unsubPrice = websocketService.onMessage('price', (message) => {
         const priceData = message.data;
         if (priceData && priceData.symbol) {
-          // Update the price in the market store
-          useMarketStore.getState().updatePrice(priceData);
+          // DEBUG: Log raw price data to see what we're receiving
+          console.log('Raw price data from WebSocket:', {
+            symbol: priceData.symbol,
+            change24h: priceData.change24h,
+            changePercent: priceData.changePercent,
+            open24h: priceData.open24h,
+            price: priceData.price
+          });
+          
+          // Transform binary protocol data to include 24hr change fields
+          const marketData = {
+            symbol: priceData.symbol,
+            bid: priceData.bid,
+            ask: priceData.ask,
+            last: priceData.price,
+            price: priceData.price,
+            volume: priceData.volume,
+            timestamp: priceData.timestamp,
+            // Include 24hr change data from backend
+            change: priceData.change24h || 0,
+            changePercent: priceData.changePercent || 0,
+            high: priceData.high24h,
+            low: priceData.low24h,
+            open: priceData.open24h
+          };
+          
+          console.log('Transformed market data:', {
+            symbol: marketData.symbol,
+            change: marketData.change,
+            changePercent: marketData.changePercent
+          });
+          
+          useMarketStore.getState().updatePrice(marketData);
         }
       });
+      cleanupFunctions.push(unsubPrice);
 
-      // Handle tick data (more frequent updates)
-      websocketService.onMessage('tick', (message) => {
-        const tickData = message.data;
-        if (tickData && tickData.symbol) {
-          useMarketStore.getState().updatePrice(tickData);
+      // Handle price_update (alternative event name)
+      const unsubPriceUpdate = websocketService.onMessage('price_update', (message) => {
+        const priceData = message.data;
+        if (priceData && priceData.symbol) {
+          // Transform binary protocol data to include 24hr change fields
+          const marketData = {
+            symbol: priceData.symbol,
+            bid: priceData.bid,
+            ask: priceData.ask,
+            last: priceData.price,
+            price: priceData.price,
+            volume: priceData.volume,
+            timestamp: priceData.timestamp,
+            // Include 24hr change data from backend
+            change: priceData.change24h || 0,
+            changePercent: priceData.changePercent || 0,
+            high: priceData.high24h,
+            low: priceData.low24h,
+            open: priceData.open24h
+          };
+          useMarketStore.getState().updatePrice(marketData);
         }
       });
+      cleanupFunctions.push(unsubPriceUpdate);
+
+      // Handle Enigma updates
+      const unsubEnigma = websocketService.onMessage('enigma_update', (message) => {
+        const enigmaData = message.data;
+        if (enigmaData && enigmaData.symbol) {
+          // Use the updateEnigmaData method from the store
+          useMarketStore.getState().updateEnigmaData(enigmaData);
+        }
+      });
+      cleanupFunctions.push(unsubEnigma);
+
+      // Handle sync progress updates
+      const unsubSyncProgress = websocketService.onMessage('sync_progress', (message) => {
+        const syncData = message.data;
+        if (syncData && syncData.symbol) {
+          const currentSymbol = useMarketStore.getState().symbols.get(syncData.symbol);
+          if (currentSymbol) {
+            // Progress is already a percentage from backend (0-100)
+            useMarketStore.getState().updateSymbolData({
+              ...currentSymbol,
+              sync_status: syncData.status || 'syncing',
+              sync_progress: syncData.progress || 0
+            });
+          }
+        }
+      });
+      cleanupFunctions.push(unsubSyncProgress);
+
+      // Handle sync complete
+      const unsubSyncComplete = websocketService.onMessage('sync_complete', (message) => {
+        const syncData = message.data;
+        if (syncData && syncData.symbol) {
+          const currentSymbol = useMarketStore.getState().symbols.get(syncData.symbol);
+          if (currentSymbol) {
+            useMarketStore.getState().updateSymbolData({
+              ...currentSymbol,
+              sync_status: 'completed',
+              sync_progress: 100
+            });
+          }
+        }
+      });
+      cleanupFunctions.push(unsubSyncComplete);
+
+      // Handle sync error
+      const unsubSyncError = websocketService.onMessage('sync_error', (message) => {
+        const syncData = message.data;
+        if (syncData && syncData.symbol) {
+          const currentSymbol = useMarketStore.getState().symbols.get(syncData.symbol);
+          if (currentSymbol) {
+            useMarketStore.getState().updateSymbolData({
+              ...currentSymbol,
+              sync_status: 'failed',
+              sync_progress: 0
+            });
+          }
+        }
+      });
+      cleanupFunctions.push(unsubSyncError);
 
       // Handle single symbol auto-subscribe
-      websocketService.onMessage('auto_subscribe', (message) => {
+      const unsubAutoSubscribe = websocketService.onMessage('auto_subscribe', (message) => {
         if (message.data && message.data.symbol) {
           useMarketStore.getState().addToWatchlist(message.data.symbol);
         }
       });
+      cleanupFunctions.push(unsubAutoSubscribe);
 
       // Handle single symbol auto-unsubscribe
-      websocketService.onMessage('auto_unsubscribe', (message) => {
+      const unsubAutoUnsubscribe = websocketService.onMessage('auto_unsubscribe', (message) => {
         if (message.data && message.data.symbol) {
           useMarketStore.getState().removeFromWatchlist(message.data.symbol);
         }
       });
+      cleanupFunctions.push(unsubAutoUnsubscribe);
 
       // Set initial connection status
       setConnected(websocketService.isConnected());
@@ -107,14 +240,18 @@ export default function Dashboard() {
       // Register connection status handlers
       const unsubscribeConnect = websocketService.onConnect(() => {
         setConnected(true);
+        // The backend will automatically subscribe to market watch symbols based on session
       });
 
       const unsubscribeDisconnect = websocketService.onDisconnect(() => {
         setConnected(false);
       });
 
-      // Cleanup connection handlers
+      // Cleanup ALL handlers
       return () => {
+        // Clean up all message handlers
+        cleanupFunctions.forEach(cleanup => cleanup());
+        // Clean up connection handlers
         unsubscribeConnect();
         unsubscribeDisconnect();
       };
@@ -137,7 +274,9 @@ export default function Dashboard() {
         {/* TradingView Chart Panel - 75% */}
         <Panel defaultSize={75} minSize={50}>
           <div className="h-full bg-white border-r border-gray-200">
-            <TradingViewChart />
+            <ChartErrorBoundary>
+              <TradingViewChart />
+            </ChartErrorBoundary>
           </div>
         </Panel>
         

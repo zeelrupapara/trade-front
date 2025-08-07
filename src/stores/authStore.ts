@@ -14,7 +14,7 @@ interface AuthState {
   clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: localStorage.getItem(SESSION_STORAGE_KEY),
   isAuthenticated: false,
@@ -55,6 +55,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Logout error
     } finally {
       localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem('has_configured_watchlist');
       set({
         user: null,
         token: null,

@@ -1,109 +1,89 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useMarketStore } from '../../stores/marketStore';
-import { websocketService } from '../../services/websocket';
 import { marketWatchService } from '../../services/marketWatch';
 import SymbolManagementModal from './SymbolManagementModal';
-
-interface PriceUpdate {
-  symbol: string;
-  bid: number;
-  ask: number;
-  last: number;
-  volume: number;
-  timestamp: number;
-}
+import { MarketWatchRow } from './MarketWatchRow';
 
 export default function MarketWatch() {
   const { 
     watchlist, 
-    isConnected,
     selectSymbol,
     selectedSymbol,
     symbols
   } = useMarketStore();
   
-  const priceRefs = useRef<Map<string, HTMLElement>>(new Map());
-  const lastPrices = useRef<Map<string, number>>(new Map());
-  const priceColors = useRef<Map<string, string>>(new Map());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [removingSymbol, setRemovingSymbol] = useState<string | null>(null);
-
-  // Update prices with animation
-  useEffect(() => {
-    symbols.forEach((symbolData, symbol) => {
-      // Update bid
-      const bidElement = document.querySelector(`[data-symbol-bid="${symbol}"]`);
-      if (bidElement) {
-        const oldBid = lastPrices.current.get(`${symbol}-bid`) || 0;
-        bidElement.textContent = symbolData.bid.toFixed(5);
-        if (oldBid !== 0 && oldBid !== symbolData.bid) {
-          const newColor = symbolData.bid > oldBid ? '#10b981' : '#ef4444';
-          bidElement.style.color = newColor;
-          priceColors.current.set(`${symbol}-bid`, newColor);
-        } else if (priceColors.current.has(`${symbol}-bid`)) {
-          bidElement.style.color = priceColors.current.get(`${symbol}-bid`)!;
-        }
-        lastPrices.current.set(`${symbol}-bid`, symbolData.bid);
-      }
+  
+  // Calculate overall sync status
+  const syncStats = useMemo(() => {
+    let syncing = 0;
+    let completed = 0;
+    let failed = 0;
+    let pending = 0;
+    let totalProgress = 0;
+    
+    watchlist.forEach(symbol => {
+      const data = symbols.get(symbol);
+      const status = data?.sync_status || 'pending';
+      const progress = data?.sync_progress || 0;
       
-      // Update ask
-      const askElement = document.querySelector(`[data-symbol-ask="${symbol}"]`);
-      if (askElement) {
-        const oldAsk = lastPrices.current.get(`${symbol}-ask`) || 0;
-        askElement.textContent = symbolData.ask.toFixed(5);
-        if (oldAsk !== 0 && oldAsk !== symbolData.ask) {
-          const newColor = symbolData.ask > oldAsk ? '#10b981' : '#ef4444';
-          askElement.style.color = newColor;
-          priceColors.current.set(`${symbol}-ask`, newColor);
-        } else if (priceColors.current.has(`${symbol}-ask`)) {
-          askElement.style.color = priceColors.current.get(`${symbol}-ask`)!;
-        }
-        lastPrices.current.set(`${symbol}-ask`, symbolData.ask);
-      }
-      
-      // Update last
-      const lastElement = document.querySelector(`[data-symbol-last="${symbol}"]`);
-      if (lastElement) {
-        const oldLast = lastPrices.current.get(`${symbol}-last`) || 0;
-        lastElement.textContent = symbolData.last.toFixed(5);
-        if (oldLast !== 0 && oldLast !== symbolData.last) {
-          const newColor = symbolData.last > oldLast ? '#10b981' : '#ef4444';
-          lastElement.style.color = newColor;
-          priceColors.current.set(`${symbol}-last`, newColor);
-        } else if (priceColors.current.has(`${symbol}-last`)) {
-          lastElement.style.color = priceColors.current.get(`${symbol}-last`)!;
-        }
-        lastPrices.current.set(`${symbol}-last`, symbolData.last);
-      }
-      
-      // Update volume
-      const volumeElement = document.querySelector(`[data-symbol-volume="${symbol}"]`);
-      if (volumeElement && symbolData.volume !== undefined) {
-        volumeElement.textContent = symbolData.volume.toFixed(2);
+      switch(status) {
+        case 'syncing':
+          syncing++;
+          totalProgress += progress;
+          break;
+        case 'completed':
+          completed++;
+          totalProgress += 100;
+          break;
+        case 'failed':
+          failed++;
+          break;
+        default:
+          pending++;
       }
     });
-  }, [symbols]);
+    
+    const avgProgress = watchlist.length > 0 ? Math.round(totalProgress / watchlist.length) : 0;
+    
+    return { syncing, completed, failed, pending, avgProgress };
+  }, [watchlist, symbols]);
 
-  const handleSymbolClick = (symbol: string) => {
+  // Memoized handlers
+  const handleSymbolClick = useCallback((symbol: string) => {
     selectSymbol(symbol);
-  };
+  }, [selectSymbol]);
 
-  const handleRemoveSymbol = async (symbol: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent row click
+  const handleRemoveSymbol = useCallback(async (symbol: string, _e: React.MouseEvent) => {
     setRemovingSymbol(symbol);
     try {
       await marketWatchService.removeSymbol(symbol);
       // The WebSocket will auto-unsubscribe and update the store
     } catch (err) {
-      // Error removing symbol
+      console.error('Error removing symbol:', err);
     } finally {
       setRemovingSymbol(null);
     }
-  };
+  }, []);
+  
+  // Memoize the symbol data for each row
+  const symbolRows = useMemo(() => {
+    return watchlist.map(symbol => {
+      const data = symbols.get(symbol);
+      return {
+        symbol,
+        bid: data?.bid || 0,
+        ask: data?.ask || 0,
+        last: data?.last || 0,
+        volume: data?.volume || 0,
+      };
+    });
+  }, [watchlist, symbols]);
 
   return (
-    <div className="h-full bg-white flex flex-col">
-      <div className="p-4 border-b border-gray-200">
+    <div className="h-full bg-gray-50 flex flex-col">
+      <div className="p-3 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-gray-900">Market Watch</h2>
           <div className="flex items-center gap-3">
@@ -132,102 +112,97 @@ export default function MarketWatch() {
                 />
               </svg>
             </button>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-xs text-gray-600">
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
-            </div>
           </div>
         </div>
         
-        <div className="text-sm text-gray-600">
-          {watchlist.length} symbols
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            {watchlist.length} symbols
+          </div>
+          
+          {/* Sync Status Summary */}
+          {watchlist.length > 0 && (
+            <div className="flex items-center gap-3 text-xs">
+              {syncStats.syncing > 0 && (
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-blue-600">{syncStats.syncing} syncing</span>
+                </div>
+              )}
+              
+              {syncStats.completed > 0 && (
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-green-600">{syncStats.completed} ready</span>
+                </div>
+              )}
+              
+              {syncStats.pending > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-gray-300"></div>
+                  <span className="text-gray-500">{syncStats.pending} pending</span>
+                </div>
+              )}
+              
+              {syncStats.failed > 0 && (
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-red-600">{syncStats.failed} failed</span>
+                </div>
+              )}
+              
+              {/* Overall Progress Bar */}
+              {syncStats.avgProgress > 0 && syncStats.avgProgress < 100 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-20 h-1 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 transition-all duration-300"
+                      style={{ width: `${syncStats.avgProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-gray-500">{syncStats.avgProgress}%</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-gray-50">
-            <tr className="text-gray-600 border-b border-gray-200">
-              <th className="text-left p-3">Symbol</th>
-              <th className="text-right p-3">Bid</th>
-              <th className="text-right p-3">Ask</th>
-              <th className="text-right p-3">Last</th>
-              <th className="text-right p-3">Volume</th>
-              <th className="text-center p-3 w-10"></th>
+      <div className="flex-1 overflow-auto bg-white">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+            <tr className="text-gray-600 text-[11px] font-medium">
+              <th className="w-6 py-2"></th>
+              <th className="text-left py-2 px-2 font-semibold">Symbol</th>
+              <th className="text-right py-2 px-2">Bid</th>
+              <th className="text-right py-2 px-2">Ask</th>
+              <th className="text-center py-2 px-2">Enigma</th>
+              <th className="text-right py-2 px-2">Last</th>
+              <th className="text-right py-2 px-2">Change</th>
+              <th className="w-6 py-2"></th>
             </tr>
           </thead>
           <tbody>
-            {watchlist.map(symbol => (
-              <tr 
-                key={symbol}
-                className={`border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors ${
-                  selectedSymbol === symbol ? 'bg-blue-50' : ''
-                }`}
-                onClick={() => handleSymbolClick(symbol)}
-                data-symbol={symbol}
-              >
-                <td className="p-3 text-gray-900 font-medium">{symbol}</td>
-                <td className="p-3 text-right">
-                  <span 
-                    data-symbol-bid={symbol}
-                    className="font-mono text-gray-700"
-                  >
-                    {symbols.get(symbol)?.bid?.toFixed(5) || '0.00000'}
-                  </span>
-                </td>
-                <td className="p-3 text-right">
-                  <span 
-                    data-symbol-ask={symbol}
-                    className="font-mono text-gray-700"
-                  >
-                    {symbols.get(symbol)?.ask?.toFixed(5) || '0.00000'}
-                  </span>
-                </td>
-                <td className="p-3 text-right">
-                  <span 
-                    data-symbol-last={symbol}
-                    className="font-mono text-gray-700"
-                  >
-                    {symbols.get(symbol)?.last?.toFixed(5) || '0.00000'}
-                  </span>
-                </td>
-                <td className="p-3 text-right">
-                  <span 
-                    data-symbol-volume={symbol}
-                    className="font-mono text-gray-700"
-                  >
-                    {symbols.get(symbol)?.volume?.toFixed(2) || '0.00'}
-                  </span>
-                </td>
-                <td className="p-3 text-center">
-                  <button
-                    onClick={(e) => handleRemoveSymbol(symbol, e)}
-                    disabled={removingSymbol === symbol}
-                    className="p-1 hover:bg-red-50 rounded transition-colors group"
-                    title="Remove from watchlist"
-                  >
-                    {removingSymbol === symbol ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
-                    ) : (
-                      <svg 
-                        className="w-4 h-4 text-gray-400 group-hover:text-red-500" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round" 
-                          strokeWidth={2} 
-                          d="M6 18L18 6M6 6l12 12" 
-                        />
-                      </svg>
-                    )}
-                  </button>
-                </td>
-              </tr>
+            {symbolRows.map(row => (
+              <MarketWatchRow
+                key={row.symbol}
+                symbol={row.symbol}
+                bid={row.bid}
+                ask={row.ask}
+                last={row.last}
+                volume={row.volume}
+                isSelected={selectedSymbol === row.symbol}
+                onSelect={handleSymbolClick}
+                onRemove={handleRemoveSymbol}
+                isRemoving={removingSymbol === row.symbol}
+              />
             ))}
           </tbody>
         </table>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { symbolsService } from '../../services/symbols';
 import type { Symbol } from '../../services/symbols';
 import { marketWatchService } from '../../services/marketWatch';
@@ -53,10 +53,13 @@ export default function SymbolManagementModal({ isOpen, onClose }: SymbolManagem
   const handleAddSymbol = async (symbol: string) => {
     setAddingSymbol(symbol);
     try {
+      console.log('Adding symbol to watchlist:', symbol);
       await marketWatchService.addSymbol(symbol);
-      // The WebSocket will auto-subscribe and update the store
+      console.log('Symbol added successfully:', symbol);
+      // The WebSocket auto_subscribe event will update the store
     } catch (err) {
-      setError(`Failed to add ${symbol}`);
+      console.error('Error adding symbol:', err);
+      setError(`Failed to add ${symbol}: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setAddingSymbol(null);
     }

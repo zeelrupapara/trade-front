@@ -1,5 +1,6 @@
 import { SESSION_STORAGE_KEY } from './auth';
 import { BinaryDecoder } from '../utils/binaryProtocol';
+import { WS_CONFIG } from '../constants';
 
 export interface WebSocketConfig {
   maxReconnectAttempts?: number;
@@ -21,6 +22,29 @@ export interface MarketTick {
   last: number;
   volume: number;
   timestamp: number;
+  // 24hr change data
+  change24h?: number;
+  changePercent?: number;
+  open24h?: number;
+  high24h?: number;
+  low24h?: number;
+}
+
+export interface EnigmaData {
+  symbol: string;
+  level: number;
+  ath: number;
+  atl: number;
+  fib_levels: {
+    '0': number;
+    '23.6': number;
+    '38.2': number;
+    '50': number;
+    '61.8': number;
+    '78.6': number;
+    '100': number;
+  };
+  timestamp: string;
 }
 
 export interface SymbolData {
@@ -31,10 +55,22 @@ export interface SymbolData {
   bid: number;
   ask: number;
   last: number;
+  price?: number;
+  high?: number;
+  low?: number;
   change: number;
   changePercent: number;
   volume: number;
   timestamp: number;
+  // 24hr change data
+  open24h?: number;
+  high24h?: number;
+  low24h?: number;
+  change24h?: number;
+  // Sync status
+  sync_status?: 'pending' | 'syncing' | 'completed' | 'failed';
+  sync_progress?: number;
+  enigma?: EnigmaData;
 }
 
 export interface WebSocketStats {
@@ -79,9 +115,9 @@ class WebSocketService {
   
   constructor(config: WebSocketConfig = {}) {
     this.config = {
-      maxReconnectAttempts: config.maxReconnectAttempts || 5,
-      reconnectDelay: config.reconnectDelay || 3000,
-      enableBinary: config.enableBinary || true, // Enable binary by default
+      maxReconnectAttempts: config.maxReconnectAttempts || WS_CONFIG.MAX_RECONNECT_ATTEMPTS,
+      reconnectDelay: config.reconnectDelay || WS_CONFIG.INITIAL_RECONNECT_DELAY,
+      enableBinary: config.enableBinary !== undefined ? config.enableBinary : true,
       debug: config.debug || false,
     };
     
@@ -89,7 +125,9 @@ class WebSocketService {
   }
   
   private debug(...args: any[]) {
-    // Debug logging disabled in production
+    if (this.config.debug) {
+      console.log('[WebSocket]', ...args);
+    }
   }
   
   connect(): Promise<void> {
@@ -117,6 +155,20 @@ class WebSocketService {
         return;
       }
       
+      // Set connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (this.isConnecting) {
+          this.isConnecting = false;
+          if (this.ws) {
+            this.ws.close();
+            this.ws = null;
+          }
+          const error = new Error('WebSocket connection timeout');
+          this.handleError(error);
+          reject(error);
+        }
+      }, WS_CONFIG.CONNECTION_TIMEOUT);
+      
       try {
         // Build WebSocket URL
         const wsUrl = this.buildWebSocketUrl(token);
@@ -130,7 +182,8 @@ class WebSocketService {
         }
         
         this.ws.onopen = () => {
-          this.debug('Connected successfully');
+          console.log('[WebSocket] Connected successfully');
+          clearTimeout(connectionTimeout);
           this.isConnecting = false;
           this.stats.connected = true;
           this.stats.reconnectAttempts = 0;
@@ -185,10 +238,18 @@ class WebSocketService {
   }
   
   private buildWebSocketUrl(token: string): string {
-    // Always use the backend directly, no proxy
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = 'localhost:8080';
-    return `${protocol}//${host}/api/v1/ws?token=${token}`;
+    // Determine the WebSocket URL based on environment
+    const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    
+    if (isProduction) {
+      // In production, use the same host as the page
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      return `${protocol}//${host}/api/v1/ws?token=${token}`;
+    } else {
+      // In development, connect directly to backend
+      return `ws://localhost:8080/api/v1/ws?token=${token}`;
+    }
   }
   
   private handleMessage(event: MessageEvent) {
@@ -206,10 +267,17 @@ class WebSocketService {
       // Handle ping/pong for latency
       if (message.type === 'pong') {
         this.stats.latency = Date.now() - this.lastPingTime;
+        // Clear pong timeout if exists
+        if ((this.pingInterval as any)?._pongTimeout) {
+          clearTimeout((this.pingInterval as any)._pongTimeout);
+        }
         return;
       }
       
-      this.debug('Message received:', message.type, message.data);
+      // Log non-price messages for debugging
+      if (message.type !== 'price' && message.type !== 'pong') {
+        console.log('[WebSocket] Message received:', message.type, message.data);
+      }
       
       // Notify specific handlers
       const handlers = this.messageHandlers.get(message.type);
@@ -311,6 +379,12 @@ class WebSocketService {
   }
   
   private queueMessage(message: any) {
+    // Limit queue size to prevent memory issues
+    if (this.messageQueue.length >= WS_CONFIG.MESSAGE_QUEUE_MAX_SIZE) {
+      console.warn('[WebSocket] Message queue full, dropping oldest message');
+      this.messageQueue.shift(); // Remove oldest message
+    }
+    
     this.messageQueue.push(message);
     this.debug('Message queued, queue size:', this.messageQueue.length);
   }
@@ -326,12 +400,26 @@ class WebSocketService {
   }
   
   private startPingInterval() {
+    let pongTimeout: NodeJS.Timeout | undefined;
+    
     this.pingInterval = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.lastPingTime = Date.now();
         this.send({ type: 'ping' });
+        
+        // Set timeout for pong response
+        pongTimeout = setTimeout(() => {
+          console.warn('[WebSocket] Pong timeout - connection may be dead');
+          // Force reconnect if no pong received
+          if (this.ws) {
+            this.ws.close();
+          }
+        }, WS_CONFIG.PONG_TIMEOUT);
       }
-    }, 30000); // Ping every 30 seconds
+    }, WS_CONFIG.PING_INTERVAL);
+    
+    // Store pong timeout cleaner
+    (this.pingInterval as any)._pongTimeout = pongTimeout;
   }
   
   private stopPingInterval() {
@@ -342,16 +430,35 @@ class WebSocketService {
   }
   
   private scheduleReconnect() {
-    this.stats.reconnectAttempts++;
-    const delay = this.config.reconnectDelay * Math.min(this.stats.reconnectAttempts, 3);
+    if (!this.shouldReconnect) return;
     
-    this.debug(`Reconnecting in ${delay}ms (attempt ${this.stats.reconnectAttempts})`);
+    this.stats.reconnectAttempts++;
+    
+    // Calculate delay with exponential backoff
+    const baseDelay = this.config.reconnectDelay;
+    const backoffFactor = WS_CONFIG.RECONNECT_BACKOFF_FACTOR;
+    const delay = Math.min(
+      baseDelay * Math.pow(backoffFactor, this.stats.reconnectAttempts - 1),
+      WS_CONFIG.MAX_RECONNECT_DELAY
+    );
+    
+    // Add jitter to prevent thundering herd
+    const jitter = Math.random() * 0.3 * delay;
+    const finalDelay = Math.floor(delay + jitter);
+    
+    this.debug(`Reconnecting in ${finalDelay}ms (attempt ${this.stats.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
     
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(error => {
         this.debug('Reconnection failed:', error);
+        
+        // If we've exhausted all attempts, notify error handlers
+        if (this.stats.reconnectAttempts >= this.config.maxReconnectAttempts) {
+          this.handleError(new Error('Maximum reconnection attempts reached'));
+          this.shouldReconnect = false;
+        }
       });
-    }, delay);
+    }, finalDelay);
   }
   
   disconnect() {
@@ -381,6 +488,7 @@ class WebSocketService {
     }
     
     this.messageHandlers.get(type)!.add(handler);
+    console.log(`[WebSocket] Handler registered for '${type}' (total: ${this.messageHandlers.get(type)!.size})`);
     
     // Return unsubscribe function
     return () => {
@@ -395,6 +503,7 @@ class WebSocketService {
       if (handlers.size === 0) {
         this.messageHandlers.delete(type);
       }
+      console.log(`[WebSocket] Handler removed for '${type}' (remaining: ${handlers.size})`);
     }
   }
   
@@ -469,6 +578,35 @@ class WebSocketService {
     }
   }
   
+  // Connection management
+  reconnect() {
+    this.debug('Manual reconnect requested');
+    this.shouldReconnect = true;
+    this.stats.reconnectAttempts = 0;
+    
+    if (this.ws) {
+      this.ws.close();
+    } else {
+      this.connect().catch(error => {
+        console.error('[WebSocket] Reconnect failed:', error);
+      });
+    }
+  }
+  
+  resetConnection() {
+    this.debug('Resetting connection');
+    this.disconnect();
+    this.shouldReconnect = true;
+    this.stats.reconnectAttempts = 0;
+    this.messageQueue = [];
+    
+    setTimeout(() => {
+      this.connect().catch(error => {
+        console.error('[WebSocket] Reset connection failed:', error);
+      });
+    }, 1000);
+  }
+  
   // Market data helpers
   subscribe(channel: string) {
     this.send({
@@ -486,45 +624,45 @@ class WebSocketService {
   
   subscribeToSymbols(symbols: string[]) {
     this.send({
-      type: 'subscribe_symbols',
+      type: 'subscribe',
       symbols: symbols,
     });
   }
   
   unsubscribeFromSymbols(symbols: string[]) {
     this.send({
-      type: 'unsubscribe_symbols',
+      type: 'unsubscribe',
       symbols: symbols,
     });
   }
   
   subscribeToSymbol(symbol: string) {
     this.send({
-      type: 'subscribe_symbol',
-      symbol: symbol,
+      type: 'subscribe',
+      symbols: [symbol],
     });
   }
   
   unsubscribeFromSymbol(symbol: string) {
     this.send({
-      type: 'unsubscribe_symbol',
-      symbol: symbol,
+      type: 'unsubscribe',
+      symbols: [symbol],
     });
   }
   
-  requestMarketWatch() {
-    this.send({
-      type: 'get_market_watch'
-    });
-  }
+  // Note: Market watch subscription is handled automatically by the backend
+  // when connecting with a session token. No manual request is needed.
 }
 
 // Create singleton instance with binary protocol enabled
 export const websocketService = new WebSocketService({
   debug: false,
-  maxReconnectAttempts: 5,
-  reconnectDelay: 3000,
+  maxReconnectAttempts: WS_CONFIG.MAX_RECONNECT_ATTEMPTS,
+  reconnectDelay: WS_CONFIG.INITIAL_RECONNECT_DELAY,
   enableBinary: true, // Enable binary protocol for ultra-low latency
 });
 
 // Debug exposure disabled in production
+// if (process.env.NODE_ENV === 'development') {
+//   (window as any).websocketService = websocketService;
+// }

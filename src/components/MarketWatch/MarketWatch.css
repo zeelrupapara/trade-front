@@ -1,0 +1,104 @@
+@keyframes pulse-up {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-3px) scale(1.1);
+    opacity: 0.9;
+  }
+}
+
+@keyframes pulse-down {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(3px) scale(1.1);
+    opacity: 0.9;
+  }
+}
+
+@keyframes spin-smooth {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.arrow-up {
+  animation: pulse-up 2s ease-in-out infinite;
+}
+
+.arrow-down {
+  animation: pulse-down 2s ease-in-out infinite;
+}
+
+.arrow-transition {
+  animation: arrow-fade 0.5s ease-in-out;
+}
+
+@keyframes arrow-fade {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.price-update {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Glow effect for price changes */
+@keyframes glow-green {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+@keyframes glow-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.price-up {
+  animation: glow-green 1s ease-out;
+}
+
+.price-down {
+  animation: glow-red 1s ease-out;
+}

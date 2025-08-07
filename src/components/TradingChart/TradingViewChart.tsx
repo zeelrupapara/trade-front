@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMarketStore } from '../../stores/marketStore';
 import datafeed from './datafeed';
 import { addEnigmaIndicator } from './enigmaIndicator';
@@ -28,8 +28,8 @@ export default function TradingViewChart() {
         const widget = new window.TradingView.widget({
           container: containerRef.current,
           symbol: selectedSymbol || watchlist[0] || 'BTCUSDT',
-          interval: 'D',
-          timezone: 'Etc/UTC',
+          interval: '5', // Default to 5 minute interval
+          timezone: 'Asia/Calcutta', // Set to IST timezone (TradingView uses Calcutta not Kolkata)
           theme: 'light',
           style: '1',
           locale: 'en',
@@ -46,6 +46,48 @@ export default function TradingViewChart() {
           datafeed: datafeed,
           custom_css_url: '/tradingview-chart.css',
           loading_screen: { backgroundColor: "#ffffff", foregroundColor: "#333333" },
+          // Available intervals for the user to select
+          enabled_features: ['study_templates'],
+          disabled_features: [],
+          charts_storage_url: 'https://saveload.tradingview.com',
+          charts_storage_api_version: '1.1',
+          client_id: 'tradingview.com',
+          user_id: 'public_user_id',
+          // Time intervals configuration
+          intervals: [
+            { value: '1', label: '1m' },
+            { value: '3', label: '3m' },
+            { value: '5', label: '5m' },
+            { value: '15', label: '15m' },
+            { value: '30', label: '30m' },
+            { value: '60', label: '1h' },
+            { value: '120', label: '2h' },
+            { value: '240', label: '4h' },
+            { value: 'D', label: '1D' },
+            { value: 'W', label: '1W' },
+            { value: 'M', label: '1M' },
+          ],
+          // Date and time format settings
+          dateformat: 'dd/MM/yyyy',
+          custom_formatters: {
+            dateFormatter: {
+              format: (date: number) => {
+                const d = new Date(date);
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}/${month}/${year}`;
+              }
+            },
+            timeFormatter: {
+              format: (date: number) => {
+                const d = new Date(date);
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                return `${hours}:${minutes}`;
+              }
+            }
+          },
           overrides: {
             // Main chart background and grid
             'paneProperties.background': '#ffffff',
@@ -120,6 +162,13 @@ export default function TradingViewChart() {
             'sessions.vertlines.sessBreaks.color': '#e0e0e0',
             'sessions.vertlines.sessBreaks.style': 'dashed',
             'sessions.vertlines.sessBreaks.width': 1,
+            
+            // Date and time format overrides for IST
+            'timeScale.rightOffset': 5,
+            'timeScale.barSpacing': 6,
+            'timeScale.timeVisible': true,
+            'timeScale.secondsVisible': false,
+            'timezone': 'Asia/Calcutta',
           },
         });
         
@@ -127,14 +176,21 @@ export default function TradingViewChart() {
         
         // Add Enigma indicator when chart is ready
         widget.onChartReady(() => {
-          try {
-            const chart = widget.chart();
-            const symbol = selectedSymbol || watchlist[0] || 'BTCUSDT';
-            // TODO: Enable enigma indicator when TradingView library properly supports custom shapes
-            // addEnigmaIndicator(chart, symbol);
-          } catch (error) {
-            console.error('Error adding Enigma indicator:', error);
-          }
+          console.log('[TradingView] Chart ready, adding Enigma indicator');
+          
+          // Small delay to ensure chart is fully initialized
+          setTimeout(() => {
+            try {
+              const chart = widget.chart();
+              const symbol = selectedSymbol || watchlist[0] || 'BTCUSDT';
+              console.log('[TradingView] Adding Enigma indicator for symbol:', symbol);
+              
+              // Add Enigma indicator to show horizontal Fibonacci levels
+              addEnigmaIndicator(chart, symbol);
+            } catch (error) {
+              console.error('[TradingView] Error adding Enigma indicator:', error);
+            }
+          }, 500);
         });
       } else {
         // Placeholder when TradingView is not loaded
@@ -144,6 +200,7 @@ export default function TradingViewChart() {
               <div style="text-align: center;">
                 <h3 style="margin-bottom: 10px; color: #333333;">TradingView Chart</h3>
                 <p style="color: #666666;">Symbol: ${selectedSymbol || watchlist[0] || 'BTCUSDT'}</p>
+                <p style="color: #666666; font-size: 14px;">Interval: 5 minutes | Timezone: IST (UTC+5:30)</p>
                 <p style="font-size: 12px; margin-top: 20px; color: #999999;">
                   To enable charts, add TradingView library to public/charting_library/
                 </p>
@@ -161,6 +218,7 @@ export default function TradingViewChart() {
       clearTimeout(timer);
       if (widgetRef.current && widgetRef.current.remove) {
         widgetRef.current.remove();
+        widgetRef.current = null;
       }
     };
   }, []); // Only run on mount, not on symbol changes
@@ -171,15 +229,20 @@ export default function TradingViewChart() {
       try {
         // Check if it's a TradingView widget
         if (window.TradingView && widgetRef.current.setSymbol) {
-          widgetRef.current.setSymbol(selectedSymbol, widgetRef.current.chart().resolution() || '1D', () => {
-            // After symbol change, update enigma indicator
-            try {
-              const chart = widgetRef.current.chart();
-              // TODO: Enable enigma indicator when TradingView library properly supports custom shapes
-              // addEnigmaIndicator(chart, selectedSymbol);
-            } catch (error) {
-              console.error('Error updating Enigma indicator:', error);
-            }
+          widgetRef.current.setSymbol(selectedSymbol, widgetRef.current.chart().resolution() || '5', () => {
+            console.log('[TradingView] Symbol changed to:', selectedSymbol);
+            
+            // After symbol change, update enigma indicator with a small delay
+            setTimeout(() => {
+              try {
+                const chart = widgetRef.current.chart();
+                console.log('[TradingView] Updating Enigma indicator for new symbol');
+                // Update Enigma indicator for new symbol
+                addEnigmaIndicator(chart, selectedSymbol);
+              } catch (error) {
+                console.error('[TradingView] Error updating Enigma indicator:', error);
+              }
+            }, 500);
           });
         } else if (containerRef.current) {
           // Update placeholder
