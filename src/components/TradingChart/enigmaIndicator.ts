@@ -1,6 +1,7 @@
 // Enigma Indicator Implementation for TradingView Chart
 import { websocketService } from '../../services/websocket';
 import { useMarketStore } from '../../stores/marketStore';
+import { enigmaService } from '../../services/enigma';
 
 export interface EnigmaData {
   symbol: string;
@@ -8,6 +9,8 @@ export interface EnigmaData {
   ath: number;
   atl: number;
   current_price?: number;
+  asset_class?: 'crypto' | 'forex' | 'stock' | 'commodity' | 'index';
+  data_source?: string;
   fib_levels: {
     [key: string]: number;
   };
@@ -19,7 +22,7 @@ let enigmaShapes: any[] = [];
 let currentChart: any = null;
 let currentSymbol: string = '';
 
-export function addEnigmaIndicator(chart: any, symbol: string) {
+export async function addEnigmaIndicator(chart: any, symbol: string) {
   // Skip if chart is not ready
   if (!chart || !symbol) {
     console.log('[Enigma] Chart or symbol not ready:', { chart: !!chart, symbol });
@@ -35,13 +38,33 @@ export function addEnigmaIndicator(chart: any, symbol: string) {
   // Clear existing Enigma shapes
   clearEnigmaShapes();
   
-  // Get symbol data from store to check if Enigma data exists
-  const symbolData = useMarketStore.getState().symbols.get(symbol);
-  console.log('[Enigma] Symbol data from store:', symbolData?.enigma ? 'Has Enigma' : 'No Enigma');
-  
-  if (symbolData?.enigma) {
-    console.log('[Enigma] Drawing initial levels, Enigma level:', symbolData.enigma.level);
-    drawEnigmaLevels(chart, symbolData.enigma);
+  // Try to fetch Enigma data from API for all-time levels
+  try {
+    const enigmaData = await enigmaService.getEnigmaLevels(symbol);
+    console.log('[Enigma] Fetched all-time data for', symbol, 'Asset class:', enigmaData.asset_class);
+    console.log('[Enigma] ATH:', enigmaData.ath, 'ATL:', enigmaData.atl, 'Current level:', enigmaData.current_level);
+    
+    // Convert API response to internal format
+    const formattedData = {
+      symbol: enigmaData.symbol,
+      level: enigmaData.current_level,
+      ath: enigmaData.ath,
+      atl: enigmaData.atl,
+      asset_class: enigmaData.asset_class,
+      fib_levels: enigmaData.levels,
+      timestamp: enigmaData.timestamp
+    };
+    
+    drawEnigmaLevels(chart, formattedData);
+  } catch (error) {
+    console.log('[Enigma] Could not fetch data from API, checking store...');
+    
+    // Fallback to store data if API fails
+    const symbolData = useMarketStore.getState().symbols.get(symbol);
+    if (symbolData?.enigma) {
+      console.log('[Enigma] Using store data, Enigma level:', symbolData.enigma.level);
+      drawEnigmaLevels(chart, symbolData.enigma);
+    }
   }
   
   // Subscribe to real-time Enigma updates
@@ -78,15 +101,18 @@ function drawEnigmaLevels(chart: any, enigmaData: any) {
     console.log('[Enigma] Drawing levels, current level:', enigmaData.level);
     console.log('[Enigma] Available Fibonacci levels:', Object.keys(fibLevels));
     
-    // Define all Fibonacci levels with colors
+    // Get asset class icon if available
+    const assetIcon = enigmaData.asset_class ? enigmaService.getAssetClassIcon(enigmaData.asset_class) : '';
+    
+    // Define all Fibonacci levels with colors (All-Time High/Low)
     const levels = [
-      { key: '0', label: 'ATL (0%)', color: '#ef4444', lineWidth: 2, lineStyle: 0 },    // Red - ATL
-      { key: '23.6', label: '23.6%', color: '#f97316', lineWidth: 1, lineStyle: 2 },    // Orange - dotted
-      { key: '38.2', label: '38.2%', color: '#f59e0b', lineWidth: 1, lineStyle: 2 },    // Amber - dotted
-      { key: '50', label: '50%', color: '#3b82f6', lineWidth: 2, lineStyle: 0 },        // Blue - solid
-      { key: '61.8', label: '61.8%', color: '#8b5cf6', lineWidth: 1, lineStyle: 2 },    // Purple - dotted
-      { key: '78.6', label: '78.6%', color: '#a855f7', lineWidth: 1, lineStyle: 2 },    // Purple - dotted
-      { key: '100', label: 'ATH (100%)', color: '#10b981', lineWidth: 2, lineStyle: 0 } // Green - ATH
+      { key: '0', label: `${assetIcon} All-Time Low (0%)`, color: '#ef4444', lineWidth: 2, lineStyle: 0 },    // Red - ATL
+      { key: '23.6', label: 'Fib 23.6%', color: '#f97316', lineWidth: 1, lineStyle: 2 },    // Orange - dotted
+      { key: '38.2', label: 'Fib 38.2%', color: '#f59e0b', lineWidth: 1, lineStyle: 2 },    // Amber - dotted
+      { key: '50', label: 'Fib 50%', color: '#3b82f6', lineWidth: 2, lineStyle: 0 },        // Blue - solid
+      { key: '61.8', label: 'Fib 61.8%', color: '#8b5cf6', lineWidth: 1, lineStyle: 2 },    // Purple - dotted
+      { key: '78.6', label: 'Fib 78.6%', color: '#a855f7', lineWidth: 1, lineStyle: 2 },    // Purple - dotted
+      { key: '100', label: `${assetIcon} All-Time High (100%)`, color: '#10b981', lineWidth: 2, lineStyle: 0 } // Green - ATH
     ];
     
     // Draw each Fibonacci level

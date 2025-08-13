@@ -169,6 +169,8 @@ export const useMarketStore = create<MarketState>((set, get) => ({
             level: data.level,
             ath: data.ath,
             atl: data.atl,
+            asset_class: data.asset_class,
+            data_source: data.data_source,
             fib_levels: data.fibLevels || data.fib_levels,
             timestamp: new Date(data.timestamp).toISOString()
           }

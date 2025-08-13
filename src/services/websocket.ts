@@ -35,6 +35,8 @@ export interface EnigmaData {
   level: number;
   ath: number;
   atl: number;
+  asset_class?: 'crypto' | 'forex' | 'stock' | 'commodity' | 'index';
+  data_source?: string;
   fib_levels: {
     '0': number;
     '23.6': number;

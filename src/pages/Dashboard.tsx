@@ -55,6 +55,18 @@ export default function Dashboard() {
               sync_progress: symbolData.sync_progress || 0,
               enigma: symbolData.enigma || undefined
             });
+            
+            // Cache ATH/ATL data for dynamic calculation
+            if (symbolData.enigma) {
+              import('../utils/enigmaCalculator').then(({ cacheEnigmaData }) => {
+                cacheEnigmaData(
+                  symbolData.symbol,
+                  symbolData.enigma.ath,
+                  symbolData.enigma.atl,
+                  symbolData.enigma.asset_class
+                );
+              });
+            }
           });
         } else {
           // Check if user needs default symbols (first time user)
@@ -130,6 +142,25 @@ export default function Dashboard() {
           });
           
           useMarketStore.getState().updatePrice(marketData);
+          
+          // Calculate dynamic Enigma level if we have cached ATH/ATL
+          import('../utils/enigmaCalculator').then(({ calculateEnigmaLevelForSymbol, getCachedEnigmaData }) => {
+            const cached = getCachedEnigmaData(priceData.symbol);
+            if (cached && priceData.price) {
+              const dynamicLevel = calculateEnigmaLevelForSymbol(priceData.symbol, priceData.price);
+              if (dynamicLevel !== null) {
+                // Update Enigma level in store with dynamic calculation
+                useMarketStore.getState().updateEnigmaData({
+                  symbol: priceData.symbol,
+                  level: dynamicLevel,
+                  ath: cached.ath,
+                  atl: cached.atl,
+                  asset_class: cached.assetClass,
+                  timestamp: new Date().toISOString()
+                });
+              }
+            }
+          });
         }
       });
       cleanupFunctions.push(unsubPrice);
@@ -163,6 +194,26 @@ export default function Dashboard() {
       const unsubEnigma = websocketService.onMessage('enigma_update', (message) => {
         const enigmaData = message.data;
         if (enigmaData && enigmaData.symbol) {
+          console.log('Enigma update received:', {
+            symbol: enigmaData.symbol,
+            level: enigmaData.level,
+            ath: enigmaData.ath,
+            atl: enigmaData.atl,
+            asset_class: enigmaData.asset_class
+          });
+          
+          // Cache ATH/ATL for dynamic calculations
+          if (enigmaData.ath && enigmaData.atl) {
+            import('../utils/enigmaCalculator').then(({ cacheEnigmaData }) => {
+              cacheEnigmaData(
+                enigmaData.symbol,
+                enigmaData.ath,
+                enigmaData.atl,
+                enigmaData.asset_class
+              );
+            });
+          }
+          
           // Use the updateEnigmaData method from the store
           useMarketStore.getState().updateEnigmaData(enigmaData);
         }

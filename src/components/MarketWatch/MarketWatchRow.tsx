@@ -61,8 +61,8 @@ const SyncStatusIcon = memo(({ status, progress }: {
 
 SyncStatusIcon.displayName = 'SyncStatusIcon';
 
-// Enigma Level Component - Shows current position between ATL and ATH
-const EnigmaIndicator = memo(({ level }: { level?: number }) => {
+// Enigma Level Component - Shows current position between All-Time Low and All-Time High
+const EnigmaIndicator = memo(({ level, assetClass }: { level?: number; assetClass?: string }) => {
   // Show -- if no data, don't show 0.0% for undefined/null
   if (level === undefined || level === null) {
     return <span className="text-gray-400 text-xs">--</span>;
@@ -76,10 +76,24 @@ const EnigmaIndicator = memo(({ level }: { level?: number }) => {
     return 'text-green-500';
   };
 
+  const getAssetIcon = () => {
+    switch(assetClass) {
+      case 'crypto': return '₿';
+      case 'forex': return '💱';
+      case 'stock': return '📈';
+      case 'commodity': return '🛢️';
+      case 'index': return '📊';
+      default: return '';
+    }
+  };
+
   return (
-    <span className={`${getColor()} font-semibold text-xs`}>
-      {level.toFixed(1)}%
-    </span>
+    <div className="flex items-center justify-center gap-1">
+      {assetClass && <span className="text-xs">{getAssetIcon()}</span>}
+      <span className={`${getColor()} font-semibold text-xs`} title={`All-Time: ${level.toFixed(1)}%`}>
+        {level.toFixed(1)}%
+      </span>
+    </div>
   );
 });
 
@@ -308,7 +322,10 @@ export const MarketWatchRow = memo(({
       
       {/* Enigma Column */}
       <td className="py-2 px-2 text-center">
-        <EnigmaIndicator level={symbolData?.enigma?.level} />
+        <EnigmaIndicator 
+          level={symbolData?.enigma?.level} 
+          assetClass={symbolData?.enigma?.asset_class}
+        />
       </td>
       
       {/* Last Price Column */}

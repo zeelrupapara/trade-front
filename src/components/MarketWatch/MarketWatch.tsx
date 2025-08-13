@@ -183,7 +183,12 @@ export default function MarketWatch() {
               <th className="text-left py-2 px-2 font-semibold">Symbol</th>
               <th className="text-right py-2 px-2">Bid</th>
               <th className="text-right py-2 px-2">Ask</th>
-              <th className="text-center py-2 px-2">Enigma</th>
+              <th className="text-center py-2 px-2">
+                <div className="flex flex-col items-center">
+                  <span>Enigma</span>
+                  <span className="text-[10px] font-normal text-gray-500">All-Time</span>
+                </div>
+              </th>
               <th className="text-right py-2 px-2">Last</th>
               <th className="text-right py-2 px-2">Change</th>
               <th className="w-6 py-2"></th>
