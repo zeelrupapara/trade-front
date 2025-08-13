@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMarketStore } from '../../stores/marketStore';
 import datafeed from './datafeed';
-import { addEnigmaIndicator } from './enigmaIndicator';
-import { addPeriodLevelsIndicator } from './periodLevelsIndicator';
+import { addEnigmaIndicator, removeEnigmaIndicator } from './enigmaIndicator';
+import { addPeriodLevelsIndicator, removePeriodLevelsIndicator } from './periodLevelsIndicator';
 
 declare global {
   interface Window {
@@ -10,10 +10,87 @@ declare global {
   }
 }
 
+// Get indicator settings from localStorage
+const getIndicatorSettings = () => {
+  const stored = localStorage.getItem('indicatorSettings');
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      // fallback to defaults
+    }
+  }
+  return {
+    enigmaEnabled: true,
+    periodLevelsEnabled: true,
+  };
+};
+
 export default function TradingViewChart() {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<any>(null);
+  const enigmaIndicatorRef = useRef<any>(null);
+  const periodLevelsIndicatorRef = useRef<any>(null);
   const { selectedSymbol, watchlist } = useMarketStore();
+  const [indicatorSettings, setIndicatorSettings] = useState(getIndicatorSettings());
+
+  // Listen for indicator settings changes
+  useEffect(() => {
+    const handleSettingsChange = (event: CustomEvent) => {
+      console.log('[TradingView] Indicator settings changed:', event.detail);
+      setIndicatorSettings(event.detail);
+      
+      // Update indicators based on new settings
+      if (widgetRef.current && window.TradingView) {
+        try {
+          const chart = widgetRef.current.chart();
+          const symbol = selectedSymbol || watchlist[0] || 'BTCUSDT';
+          
+          // Handle Enigma indicator based on settings
+          if (event.detail.enigmaEnabled) {
+            // Add Enigma indicator if not already added
+            if (!enigmaIndicatorRef.current) {
+              console.log('[TradingView] Enabling Enigma indicator');
+              addEnigmaIndicator(chart, symbol);
+              enigmaIndicatorRef.current = true;
+            }
+          } else {
+            // Remove Enigma indicator if it exists
+            if (enigmaIndicatorRef.current) {
+              console.log('[TradingView] Disabling Enigma indicator');
+              removeEnigmaIndicator();
+              enigmaIndicatorRef.current = null;
+            }
+          }
+          
+          // Handle Period Levels indicator based on settings
+          if (event.detail.periodLevelsEnabled) {
+            // Add Period Levels indicator if not already added
+            if (!periodLevelsIndicatorRef.current) {
+              console.log('[TradingView] Enabling Period Levels indicator');
+              addPeriodLevelsIndicator(chart, symbol);
+              periodLevelsIndicatorRef.current = true;
+            }
+          } else {
+            // Remove Period Levels indicator if it exists
+            if (periodLevelsIndicatorRef.current) {
+              console.log('[TradingView] Disabling Period Levels indicator');
+              removePeriodLevelsIndicator();
+              periodLevelsIndicatorRef.current = null;
+            }
+          }
+        } catch (error) {
+          console.error('[TradingView] Error updating indicators:', error);
+        }
+      }
+    };
+    
+    window.addEventListener('indicatorSettingsChanged', handleSettingsChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('indicatorSettingsChanged', handleSettingsChange as EventListener);
+    };
+  }, [selectedSymbol, watchlist]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -175,24 +252,33 @@ export default function TradingViewChart() {
         
         widgetRef.current = widget;
         
-        // Add Enigma indicator when chart is ready
+        // Add indicators when chart is ready based on settings
         widget.onChartReady(() => {
-          console.log('[TradingView] Chart ready, adding Enigma indicator');
+          console.log('[TradingView] Chart ready, checking indicator settings');
           
           // Small delay to ensure chart is fully initialized
           setTimeout(() => {
             try {
               const chart = widget.chart();
               const symbol = selectedSymbol || watchlist[0] || 'BTCUSDT';
-              console.log('[TradingView] Adding Enigma indicator for symbol:', symbol);
+              const settings = getIndicatorSettings();
+              console.log('[TradingView] Indicator settings:', settings);
               
-              // Add Enigma indicator to show horizontal Fibonacci levels
-              addEnigmaIndicator(chart, symbol);
+              // Add Enigma indicator if enabled
+              if (settings.enigmaEnabled) {
+                console.log('[TradingView] Adding Enigma indicator for symbol:', symbol);
+                addEnigmaIndicator(chart, symbol);
+                enigmaIndicatorRef.current = true;
+              }
               
-              // Add Period Levels indicator to show daily/weekly/monthly/yearly levels
-              addPeriodLevelsIndicator(chart, symbol);
+              // Add Period Levels indicator if enabled
+              if (settings.periodLevelsEnabled) {
+                console.log('[TradingView] Adding Period Levels indicator for symbol:', symbol);
+                addPeriodLevelsIndicator(chart, symbol);
+                periodLevelsIndicatorRef.current = true;
+              }
             } catch (error) {
-              console.error('[TradingView] Error adding Enigma indicator:', error);
+              console.error('[TradingView] Error adding indicators:', error);
             }
           }, 500);
         });
@@ -220,6 +306,15 @@ export default function TradingViewChart() {
 
     return () => {
       clearTimeout(timer);
+      // Clean up indicators before removing widget
+      if (enigmaIndicatorRef.current) {
+        removeEnigmaIndicator();
+        enigmaIndicatorRef.current = null;
+      }
+      if (periodLevelsIndicatorRef.current) {
+        removePeriodLevelsIndicator();
+        periodLevelsIndicatorRef.current = null;
+      }
       if (widgetRef.current && widgetRef.current.remove) {
         widgetRef.current.remove();
         widgetRef.current = null;
@@ -236,17 +331,38 @@ export default function TradingViewChart() {
           widgetRef.current.setSymbol(selectedSymbol, widgetRef.current.chart().resolution() || '5', () => {
             console.log('[TradingView] Symbol changed to:', selectedSymbol);
             
-            // After symbol change, update enigma indicator with a small delay
+            // After symbol change, update indicators with a small delay
             setTimeout(() => {
               try {
                 const chart = widgetRef.current.chart();
-                console.log('[TradingView] Updating indicators for new symbol');
-                // Update Enigma indicator for new symbol
-                addEnigmaIndicator(chart, selectedSymbol);
-                // Update Period Levels indicator for new symbol
-                addPeriodLevelsIndicator(chart, selectedSymbol);
+                const settings = getIndicatorSettings();
+                console.log('[TradingView] Updating indicators for new symbol with settings:', settings);
+                
+                // Clear existing indicators using proper cleanup functions
+                if (enigmaIndicatorRef.current) {
+                  console.log('[TradingView] Removing old Enigma indicator');
+                  removeEnigmaIndicator();
+                  enigmaIndicatorRef.current = null;
+                }
+                if (periodLevelsIndicatorRef.current) {
+                  console.log('[TradingView] Removing old Period Levels indicator');
+                  removePeriodLevelsIndicator();
+                  periodLevelsIndicatorRef.current = null;
+                }
+                
+                // Add indicators based on settings
+                if (settings.enigmaEnabled) {
+                  console.log('[TradingView] Re-adding Enigma indicator for new symbol');
+                  addEnigmaIndicator(chart, selectedSymbol);
+                  enigmaIndicatorRef.current = true;
+                }
+                if (settings.periodLevelsEnabled) {
+                  console.log('[TradingView] Re-adding Period Levels indicator for new symbol');
+                  addPeriodLevelsIndicator(chart, selectedSymbol);
+                  periodLevelsIndicatorRef.current = true;
+                }
               } catch (error) {
-                console.error('[TradingView] Error updating Enigma indicator:', error);
+                console.error('[TradingView] Error updating indicators:', error);
               }
             }, 500);
           });
