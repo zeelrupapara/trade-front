@@ -61,9 +61,9 @@ export default function Dashboard() {
               import('../utils/enigmaCalculator').then(({ cacheEnigmaData }) => {
                 cacheEnigmaData(
                   symbolData.symbol,
-                  symbolData.enigma.ath,
-                  symbolData.enigma.atl,
-                  symbolData.enigma.asset_class
+                  symbolData.enigma!.ath,
+                  symbolData.enigma!.atl,
+                  symbolData.enigma!.asset_class
                 );
               });
             }

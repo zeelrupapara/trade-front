@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useMarketStore } from '../../stores/marketStore';
 import datafeed from './datafeed';
 import { addEnigmaIndicator } from './enigmaIndicator';
+import { addPeriodLevelsIndicator } from './periodLevelsIndicator';
 
 declare global {
   interface Window {
@@ -187,6 +188,9 @@ export default function TradingViewChart() {
               
               // Add Enigma indicator to show horizontal Fibonacci levels
               addEnigmaIndicator(chart, symbol);
+              
+              // Add Period Levels indicator to show daily/weekly/monthly/yearly levels
+              addPeriodLevelsIndicator(chart, symbol);
             } catch (error) {
               console.error('[TradingView] Error adding Enigma indicator:', error);
             }
@@ -236,9 +240,11 @@ export default function TradingViewChart() {
             setTimeout(() => {
               try {
                 const chart = widgetRef.current.chart();
-                console.log('[TradingView] Updating Enigma indicator for new symbol');
+                console.log('[TradingView] Updating indicators for new symbol');
                 // Update Enigma indicator for new symbol
                 addEnigmaIndicator(chart, selectedSymbol);
+                // Update Period Levels indicator for new symbol
+                addPeriodLevelsIndicator(chart, selectedSymbol);
               } catch (error) {
                 console.error('[TradingView] Error updating Enigma indicator:', error);
               }

@@ -49,6 +49,36 @@ export interface EnigmaData {
   timestamp: string;
 }
 
+// Period Levels WebSocket Types
+export interface PeriodLevelUpdate {
+  type: 'new_high' | 'new_low' | 'period_boundary' | 'level_approach';
+  symbol: string;
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  level?: any;
+  old_value?: number;
+  new_value?: number;
+  current_price?: number;
+  timestamp: number;
+}
+
+export interface PeriodBoundaryEvent {
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  affected_symbols: string[];
+  timestamp: number;
+}
+
+export interface LevelApproachAlert {
+  symbol: string;
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  level: string;
+  level_price: number;
+  current_price: number;
+  distance: number;
+  distance_percent: number;
+  direction: 'above' | 'below';
+  timestamp: number;
+}
+
 export interface SymbolData {
   symbol: string;
   description: string;

@@ -1,0 +1,293 @@
+.period-levels-container {
+  width: 100%;
+  padding: 1rem;
+  background: var(--card-background, #1a1a1a);
+  border-radius: 8px;
+}
+
+.period-levels-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.period-levels-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.period-levels-header .symbol {
+  font-size: 0.9rem;
+  color: #4CAF50;
+  font-weight: 600;
+}
+
+.periods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.period-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  border-top: 3px solid;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.period-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.period-card.active {
+  box-shadow: 0 0 20px rgba(76, 175, 80, 0.2);
+}
+
+.period-header {
+  padding: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.period-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.period-name {
+  font-weight: 600;
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+
+.active-badge {
+  background: #4CAF50;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.period-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.period-range .high {
+  color: #4CAF50;
+  font-weight: 500;
+}
+
+.period-range .low {
+  color: #f44336;
+  font-weight: 500;
+}
+
+.period-range .separator {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.position-indicator {
+  padding: 0 0.75rem 0.75rem;
+}
+
+.position-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  position: relative;
+  margin-bottom: 0.25rem;
+}
+
+.position-marker {
+  position: absolute;
+  top: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 0 10px currentColor;
+}
+
+.position-text {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.fibonacci-levels {
+  padding: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+.levels-grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.fib-level {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.fib-level:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(4px);
+}
+
+.fib-level.near-price {
+  background: rgba(76, 175, 80, 0.1);
+  border-left-color: #4CAF50;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.fib-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.fib-value {
+  font-size: 0.85rem;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-weight: 500;
+}
+
+/* Fibonacci level colors */
+.fib-level:nth-child(1) { border-left-color: #dc3545; }
+.fib-level:nth-child(2) { border-left-color: #fd7e14; }
+.fib-level:nth-child(3) { border-left-color: #ffc107; }
+.fib-level:nth-child(4) { border-left-color: #28a745; }
+.fib-level:nth-child(5) { border-left-color: #17a2b8; }
+.fib-level:nth-child(6) { border-left-color: #6610f2; }
+.fib-level:nth-child(7) { border-left-color: #e83e8c; }
+
+.alerts-container {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  border-left: 3px solid;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.alert.above {
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.alert.below {
+  background: rgba(244, 67, 54, 0.1);
+}
+
+.alert-icon {
+  font-size: 1rem;
+}
+
+.alert-text {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.error {
+  color: #f44336;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .periods-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dark mode specific */
+@media (prefers-color-scheme: dark) {
+  .period-levels-container {
+    background: #1a1a1a;
+  }
+}
+
+/* Light mode adjustments */
+@media (prefers-color-scheme: light) {
+  .period-levels-container {
+    background: #fff;
+    color: #333;
+  }
+  
+  .period-levels-header h3 {
+    color: #333;
+  }
+  
+  .period-card {
+    background: rgba(0, 0, 0, 0.03);
+  }
+  
+  .period-card:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+  
+  .fib-value {
+    color: #333;
+  }
+}
